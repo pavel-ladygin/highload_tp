@@ -32,7 +32,7 @@ MVP включает пять функций:
 | Производные варианты вместе | 19,6875 MB | `30 × (0,75 + 1,5 + 3) / 8` |
 | Средний битрейт доставки | 1,5 Mbit/s | Допущение о долях времени 480p/720p/1080p — 40/40/20 %: `0,4 × 0,75 + 0,4 × 1,5 + 0,2 × 3` |
 | Возраст каталога / срок хранения оригинала | 5 лет / до 1 суток | Для каталога — 1 825 дней постоянной нагрузки. Оригинал удаляем после успешной обработки и сохранения вариантов; сутки — расчетное окно временного буфера |
-| Сырые события просмотра / история | 30 дней / последние 100 просмотров | Проектные ограничения хранения |
+| Сырые продуктовые события / история | 30 дней / последние 100 просмотров | Общая аналитика действий MVP; история хранится списком по пользователю |
 | Срок сессии | 10 дней | Допущение для расчета авторизации и временного хранения сессий |
 | Репликация | 3 копии | По одной в Москве, Екатеринбурге и Новосибирске |
 | CDN byte hit ratio | 98 % базовый; 90 % для мощности origin | Допущения о доле байтов, отданных из кэша; не статистика провайдера [4] |
@@ -101,13 +101,13 @@ MVP включает пять функций:
 | Клиенты → upload, оригиналы | 1,906 | 3,812 | 5 145,552 |
 | Внешний API, запросы + ответы | 4,522 | 9,045 | 23 872,359 |
 | Между ЦОДами: две дополнительные копии медиа | 5,427 | 10,855 | 14 653,854 |
-| Между ЦОДами: две дополнительные копии сырых событий | 0,369 | 0,739 | 1 994,400 |
+| Между ЦОДами: две дополнительные копии продуктовых событий | 0,492 | 0,984 | 2 547,347 |
 
 Размер API-запроса с ответом, включая HTTP-заголовки: лента и поиск — 31 KB, список комментариев — 15 KB, просмотр — 1 KB, остальные операции — 2 KB. Суточный трафик — сумма `операций × размер`, пиковый — сумма `RPS_пик × размер × 8` с коэффициентом каждого метода. Сетевые накладные расходы и повторы покрываются запасом.
 
 Снижение byte hit ratio на один процентный пункт добавляет origin `34,625 Gbit/s` на пике. При допущении 10 % request miss: `577 083,33 × 0,1 = 57 708,33 RPS`, с запасом — `115 416,67`. Совпадение долей промахов по байтам и запросам — допущение. Эффект origin shield не учитывается.
 
-Репликация медиа: `2 × 110 800 × (46,44 + 19,6875) MB = 14 653,854 GB/сутки`, пик ×4; оригинал копируется временно. Репликация сырых событий: `2 × 4 986 000 000 × 200 B = 1 994,4 GB/сутки`, пик ×2. Репликация профилей, реакций и метаданных в эти строки не включена.
+Репликация медиа: `2 × 110 800 × (46,44 + 19,6875) MB = 14 653,854 GB/сутки`, пик ×4; оригинал копируется временно. Репликация продуктовых событий: `2 × 6 368 368 500 × 200 B = 2 547,3474 GB/сутки`; пик — сумма потоков событий с коэффициентами их действий (см. ДЗ5). Репликация профилей, реакций и метаданных в эти строки не включена.
 
 ### 2.4. Хранение
 
@@ -120,16 +120,17 @@ MVP включает пять функций:
 | Три варианта, отдельные файлы, 5 лет | 606 630 000 | 6 562 500 в среднем | 11 943,028 | 2 388,606 |
 | Метаданные роликов, включая название и теги, 5 лет | 202 210 000 | 2 000 | 1,213 | 0,243 |
 | Поисковый индекс роликов, 5 лет | 202 210 000 | 1 000 | 0,607 | 0,121 |
-| Лайки, 5 лет | 909 945 000 000 | 16 | 43,677 | 8,735 |
+| Лайки, наборы по пользователю, 5 лет | До 113 000 000 наборов; 909 945 000 000 ID | 8 B/ID + 32 B/набор | 21,850 | 4,369 |
 | Комментарии, 5 лет | 90 994 500 000 | 512 | 139,768 | 27,954 |
-| Сырые события просмотра, окно 30 дней | 149 580 000 000 | 200 | 89,748 | 0 |
+| Продуктовые события, окно 30 дней | 191 051 055 000 | 200 | 114,631 | 0 |
 | Учетные записи и профили | 113 000 000 | 1 000 | 0,339 | 0,030 |
-| История, до 100 записей на аккаунт | 11 300 000 000 | 16 | 0,542 | 0,049 |
+| История, список до 100 просмотров на аккаунт | 113 000 000 списков | 3 232 | 1,096 | 0,098 |
+| Интересы к тегам, активные за 30 дней | До 56 500 000 | 672 | 0,114 | 0 |
 | Дневная активность, окно 365 дней | 10 110 500 000 | 64 | 1,941 | 0 |
 | Сессии, окно 10 дней | 27 700 000 | 256 | 0,021 | 0 |
-| **Итого, без временных оригиналов** | — | — | **12 220,885** | **2 425,737** |
+| **Итого, без временных оригиналов** | — | — | **12 224,607** | **2 421,420** |
 
-Оценен полезный объем без служебных расходов СУБД, журналов и резервных копий. При постоянных DAU и частотах действий число аккаунтов растет на `27 700 × 365 = 10 110 500` в год: увеличиваются профили и емкость истории. Объемы событий, дневной активности и сессий ограничены окнами хранения. Сессии: `2 770 000 входов/сутки × 10 дней`.
+Оценен полезный объем без служебных расходов СУБД, физического разбиения наборов на блоки, журналов и резервных копий. При постоянных DAU и частотах действий число аккаунтов растет на `27 700 × 365 = 10 110 500` в год: увеличиваются профили и емкость истории. Объемы событий, дневной активности, интересов и сессий ограничены окнами хранения. Сессии: `2 770 000 входов/сутки × 10 дней`. Для верхней оценки хранения лайков все 18 изменений в сутки считаются новыми добавлениями; снятие лайков не уменьшает прогноз.
 
 Каталог / текущий MAU, без реплик; это доля общего каталога, а не собственные публикации пользователя:
 
@@ -138,10 +139,10 @@ MVP включает пять функций:
 | Готовые видео, файлы трех качеств | 10,737 | 0,070460 |
 | Метаданные роликов | 3,579 | 0,00000716 |
 | Поисковый индекс роликов | 3,579 | 0,00000358 |
-| Лайки | 16 105,221 | 0,00025768 |
+| Лайки, ID в пользовательских наборах | 16 105,221 | 0,00012891 |
 | Комментарии | 1 610,522 | 0,00082459 |
 
-Общий объем с тремя копиями, без временных оригиналов: **12 220,885 TB сейчас** и **14 646,622 TB через год**. Из них готовые видео занимают **11 943,028 / 14 331,634 TB**. С учетом суточного буфера оригиналов текущая оценка — **12 236,321 TB**.
+Общий объем с тремя копиями, без временных оригиналов: **12 224,607 TB сейчас** и **14 646,027 TB через год**. Из них готовые видео занимают **11 943,028 / 14 331,634 TB**. С учетом суточного буфера оригиналов текущая оценка — **12 240,043 TB**.
 
 ## 3. Глобальная балансировка
 
@@ -308,9 +309,9 @@ CPS M: `90 153 + 15,3 + 28 854 = 119 022`; E/N — около `98 210`. Тест
 
 ## 5. Логическая схема БД
 
-Первая схема показывает основные таблицы, вторая — файлы, кэши и буферы. User и Video во второй схеме ссылаются на таблицы первой. `PK` — первичный ключ, `FK` — внешний. Типы данных логические и не привязаны к СУБД.
+Схемы показывают сущности, поля и логические связи без привязки к СУБД и шардингу. `PK`, `FK`, `UK` — первичный, внешний и уникальный ключи.
 
-**Основные данные**
+**Аккаунты, контент, поиск и состояние**
 
 ```mermaid
 erDiagram
@@ -318,23 +319,48 @@ erDiagram
         int64 user_id PK
         timestamp created_at
         enum status
-        int64 history_cursor
     }
     Profile {
         int64 user_id PK, FK
         string display_name
         timestamp updated_at
     }
+    AuthCredential {
+        int64 user_id PK, FK
+        string login UK
+        string password_hash
+        timestamp updated_at
+    }
+    AuthSession {
+        string token_hash PK
+        int64 user_id FK
+        timestamp created_at
+        timestamp expires_at
+        enum status
+    }
     Video {
         int64 video_id PK
         int64 author_id FK
+        string title
+        string[] tags
         timestamp created_at
         int64 duration_s
         enum status
     }
-    Like {
-        int64 user_id PK, FK
+    SearchDocument {
         int64 video_id PK, FK
+        int64 author_id FK
+        string[] author_terms
+        string[] title_terms
+        string[] tag_terms
+        timestamp indexed_at
+    }
+    UserLikes {
+        int64 user_id PK, FK
+        int64 version
+        timestamp updated_at
+        int64 count
+        int64[] video_ids
     }
     Comment {
         int64 comment_id PK
@@ -344,21 +370,35 @@ erDiagram
         string body
         enum status
     }
-    ViewEvent {
+    ProductEvent {
         int64 event_id PK
         int64 user_id FK
-        int64 video_id FK
-        timestamp started_at
-        int64 watched_ms
-        string idempotency_key
-        enum processing_state
+        int64 video_id FK "nullable"
+        enum event_type
+        int64 partition_id
+        int64 sequence_no
+        timestamp occurred_at
+        json attributes
     }
-    PlaybackHistory {
+    UserHistory {
         int64 user_id PK, FK
-        int64 slot PK
-        int64 video_id FK
-        timestamp last_watched_at
-        int64 watched_ms
+        int64 head
+        int64 version
+        timestamp updated_at
+        HistoryEntry[] recent_views
+    }
+    UserInterest {
+        int64 user_id PK, FK
+        TagWeight[] tag_weights
+        int64 version
+        timestamp updated_at
+        timestamp expires_at
+    }
+    EventConsumerState {
+        string consumer_name PK
+        int64 partition_id PK
+        int64 last_sequence
+        timestamp updated_at
     }
     DailyActivity {
         int64 user_id PK, FK
@@ -374,17 +414,22 @@ erDiagram
     }
 
     User ||--|| Profile : "профиль"
+    User ||--|| AuthCredential : "учетные данные"
+    User ||--o{ AuthSession : "сессии"
     User ||--o{ Video : "автор"
-    User ||--o{ Like : "ставит"
-    Video ||--o{ Like : "получает"
+    Video ||--o| SearchDocument : "индекс опубликованного ролика"
+    User ||--o{ SearchDocument : "поиск по автору"
+    User ||--o| UserLikes : "набор лайков"
+    Video }o--o{ UserLikes : "ID в наборах"
     User ||--o{ Comment : "пишет"
     Video ||--o{ Comment : "комментарии"
-    User ||--o{ ViewEvent : "просматривает"
-    Video ||--o{ ViewEvent : "просмотры"
-    User ||--o{ PlaybackHistory : "история"
-    Video ||--o{ PlaybackHistory : "в истории"
+    User ||--o{ ProductEvent : "действия"
+    Video |o--o{ ProductEvent : "объект действия"
+    User ||--o| UserHistory : "ограниченная история"
+    Video }o--o{ UserHistory : "ID в истории"
+    User ||--o| UserInterest : "интересы"
     User ||--o{ DailyActivity : "активность"
-    Video ||--o| VideoCounter : "счетчики"
+    Video ||--o| VideoCounter : "метрики и счетчики реакций"
 ```
 
 **Файлы, кэши и буферы**
@@ -397,6 +442,8 @@ erDiagram
         int64 size_bytes
         string checksum
         int64[] region_copies
+        timestamp created_at
+        timestamp expires_at
     }
     VideoVariant {
         int64 video_id PK, FK
@@ -414,8 +461,8 @@ erDiagram
         timestamp created_at
         timestamp expires_at
         enum state
-        string part_refs
-        blob staging_payload
+        string staging_ref
+        blob received_parts
     }
     TranscodeTaskQueue {
         int64 task_id PK
@@ -423,14 +470,17 @@ erDiagram
         enum quality
         timestamp created_at
         int64 attempt
+        enum state
         timestamp expires_at
     }
-    ViewEventBuffer {
+    ProductEventBuffer {
         int64 event_id PK
         int64 user_id FK
-        int64 video_id FK
+        int64 video_id FK "nullable"
+        enum event_type
         timestamp occurred_at
-        int64 watched_ms
+        json attributes
+        enum state
         timestamp expires_at
     }
     CounterBuffer {
@@ -443,89 +493,293 @@ erDiagram
         enum applied_state
     }
     CandidatePool {
-        int64 video_id PK, FK
-        int64 view_count
-        int64 duration_s
+        string pool_key PK
+        CandidateEntry[] candidates
+        int64 version
         timestamp generated_at
     }
     FeedCache {
         int64 user_id PK, FK
-        int64 page_no PK
+        int64 feed_id PK
         int64[] video_ids
         timestamp created_at
         timestamp expires_at
     }
     IdempotencyRecord {
-        int64 user_id PK, FK
         string operation_id PK
+        int64 user_id FK
         enum operation
         string result_ref
         timestamp created_at
         timestamp expires_at
     }
 
-    Video ||--|| OriginalMedia : "оригинал"
+    Video ||--o| OriginalMedia : "временный оригинал"
     Video ||--o{ VideoVariant : "до трех качеств"
     User ||--o{ UploadSession : "загружает"
     Video ||--o| UploadSession : "получает"
     Video ||--o{ TranscodeTaskQueue : "задачи обработки"
-    User ||--o{ ViewEventBuffer : "просматривает"
-    Video ||--o{ ViewEventBuffer : "просмотры"
-    Video ||--o{ CounterBuffer : "изменения счетчиков"
-    Video ||--o| CandidatePool : "кандидат ленты"
+    User ||--o{ ProductEventBuffer : "действия"
+    Video |o--o{ ProductEventBuffer : "объект действия"
+    Video ||--o{ CounterBuffer : "изменения метрик"
+    Video }o--o{ CandidatePool : "ID в списке кандидатов"
     User ||--o{ FeedCache : "страницы ленты"
     Video }o--o{ FeedCache : "ролики страницы"
-    User ||--o{ IdempotencyRecord : "защита от повторов"
+    User ||--o{ IdempotencyRecord : "результат операции"
 ```
 
-Во время обработки у ролика может быть от 0 до 3 готовых вариантов. Публикация разрешена после подготовки всех трех вариантов и их копий во всех регионах. Сегменты относятся к VideoVariant, манифест строится по данным Video.
+### 5.1. Назначение данных и потоков
 
-### 5.1. Допущения и перевод нагрузки в QPS
+`Video` хранит название и теги; `SearchDocument` — перестраиваемую копию для поиска по ролику и автору. По просмотрам обновляются история и дневная активность, по просмотрам и реакциям — интересы и счетчики. `UserLikes` — набор ID по пользователю, а счетчики хранятся в `VideoCounter`.
 
-Средний QPS — число операций в сутки / 86 400; пик учитывает суточную неравномерность. Единицы таблицы — строки, страницы или файлы. Просмотр, лайк и комментарий создают по одной строке; переход статуса считается отдельно. Выдача ленты читает данные до 20 роликов, их лайки и счетчики, 100 записей истории и до 100 кандидатов. При лимите 20 комментариев пик чтения — `11 541 × 20 = 230 833 строк/с`. Для очередей указаны строки или задачи, а не пакеты. Значения округлены.
+`UserHistory` — кольцевой список до 100 просмотров; `UserInterest` хранит до 20 пар тег–вес. `CandidatePool` содержит 1 000 популярных опубликованных роликов и обновляется раз в 15 с; персональная лента исключает последние просмотры и ранжирует кандидатов по весам тегов и популярности. `FeedCache` хранит неизменяемый список до 1 000 ID на 30 минут; продолжение выдачи использует тот же `feed_id` и смещение.
 
-User и Profile связаны отношением 1:1. Для 113 млн пар заложено по 1 000 B: 64 B на User и 936 B на Profile. Video (2 000 B) включает метаданные и ссылки; OriginalMedia и VideoVariant учитывают только файлы. Объем постоянных данных и IdempotencyRecord указан для одной копии, для трех копий его умножают на 3. Временные данные посчитаны без репликации.
+`ProductEvent` хранит сырые события действий MVP за 30 дней. Поток до записи в DWH также читают обработчики рекомендаций; отдельных внешних запросов это не создает.
 
-При просмотре User обновляет указатель на последнее событие; изменения профилей в MVP не учитываются. Video проходит состояния загрузки, обработки и публикации. Профили авторов читаются с лентой и комментариями. Обработчик читает оригинал один раз, затем зрителям отдаются готовые варианты. Попадания кэша не уменьшают расчетную нагрузку.
+Файлы хранятся как объекты по `object_ref`; staging содержит части загрузки. После сборки объем оригинала учитывается один раз. Оригинал удаляется после готовности вариантов и их региональных копий; штатное окно — до 24 ч. `segment_ranges` описывает диапазоны внутри варианта видео.
 
-### 5.2. Сущности, объемы и нагрузка
+### 5.2. Объемы и нагрузка
 
-**Постоянные данные и файлы**
+Объемы указаны для одной копии, без индексов и расходов СУБД. QPS — обычный пик; запас ×2 применяется отдельно. Это логические обращения: чтение карточек считается по строкам, история и лента — по спискам, проверка лайков — пакетом до 20 ID. Для временных данных объем равен пиковому потоку новых объектов × срок хранения × размер.
 
-| Сущность / назначение | Записей × размер | Логический объем | Чтение, среднее / пик | Запись, среднее / пик |
-| --- | --- | ---: | ---: | ---: |
-| User (учетная запись) + Profile (данные автора), 1:1 | 113 млн × (64 + 936) B | User 7,2 GB + Profile 105 GB = 113 GB | User 0; Profile 173 125 / 346 250 строк/с | User 57 708 / 115 417 обновлений/с; Profile 0 |
-| Video (метаданные) | 101 млн × 2 000 B | 202 GB | 57 708 / 115 417 строк/с | 1,9 / 7,6 переходов статуса/с |
-| OriginalMedia (оригинал) | 101 млн × 45 MB | 4 549 TB | 0,64 / 2,5 чтений/с | 0,64 / 2,5 записей/с; 2 493 GB/сутки |
-| VideoVariant (480p/720p/1080p) | 303 млн × 6,5 MB | 1 990 TB | ~28 854 / 57 708 origin-запросов/с при 10% request miss | 1,9 / 7,6 вариантов/с; 1 090 GB/сутки |
-| Like (User ID + Video ID, 16 B) | 303 млрд | 4,8 TB | 57 708 / 115 417 проверок/с | 1 924 / 5 771/с |
-| Comment | 10,1 млрд × 512 B | 5,1 TB | 115 417 / 230 833 строк/с | 64,1 / 192/с |
-| ViewEvent (сырые события, 30 дней) | 149 млрд × 200 B | 29,9 TB | 57 708 / 115 417 событий/с | 57 708 / 115 417 вставок/с + отметки обработки |
-| PlaybackHistory (100 последних событий на аккаунт) | 11,3 млрд × 40 B | 452 GB (на 271,2 GB больше §2) | 288 542 / 577 083 строк/с | 57 708 / 115 417 замен слота/с |
-| DailyActivity (агрегаты, 365 дней) | 10,1 млрд × 64 B | 647 GB | 0 | До 57 708 / 115 417 обновлений/с |
-| VideoCounter (публичные счетчики) | 101 млн × 32 B | 3,2 GB | 57 708 / 115 417 строк/с | До 59 696 / 121 380 дельт/с |
+**Постоянные данные и онлайн-состояние**
 
-**Временные и служебные данные**
+| Сущность / данные | Количество / размер | Объем одной копии | Чтение, пик | Запись, пик |
+| --- | --- | ---: | --- | --- |
+| User | 113 млн × 64 B | 7,232 GB | 64,12 строк/с | 0,64 вставок/с |
+| Profile | 113 млн × 424 B | 47,912 GB | 384 722,22 строк/с | 0,64 вставок/с |
+| AuthCredential | 113 млн × 512 B | 57,856 GB | 64,76 проверок/с | 0,64 вставок/с |
+| Video | 202,21 млн × 2 000 B | 404,420 GB | 288 415,97 строк/с | 15,39 вставок и смен статуса/с |
+| SearchDocument | 202,21 млн × 1 000 B | 202,210 GB | 1 923,61 запросов индекса/с | 5,13 документов/с |
+| VideoVariant | 606,63 млн × 6,5625 MB в среднем | 3 981,009 TB | 57 708,33 origin-запросов/с | 15,39 файлов/с |
+| UserLikes | До 113 млн наборов; 909,945 млрд ID × 8 B + 32 B/набор | 7,283 TB | 7 694,44 пакетных проверок до 20 ID/с | 17 312,50 изменений элемента/с |
+| Comment | 90,9945 млрд × 512 B | 46,589 TB | 230 833,33 строк/с | 1 731,25 вставок/с |
+| ProductEvent, сырой DWH, 30 дней | 191,051055 млрд × 200 B | 38,210 TB | 134 460,42 событий/с для онлайн-состояния | 153 766,42 вставок/с |
+| UserHistory, список до 100 просмотров | 113 млн × 3 232 B | 365,216 GB | 5 770,83 агрегатов/с | 115 416,67 изменений элемента/с |
+| UserInterest, окно активности 30 дней | До 56,5 млн × 672 B | 37,968 GB | 140 231,25 агрегатов/с | 134 460,42 обновлений/с |
+| DailyActivity, 365 дней | 10,1105 млрд × 64 B | 647,072 GB | 0 в данном сценарии | 115 416,67 обновлений/с |
+| VideoCounter | 202,21 млн × 32 B | 6,471 GB | 153 955,56 строк/с | 134 465,55 обновлений и вставок/с |
+| EventConsumerState | 256 позиций × 64 B | 16,384 KB | До 256 позиций/с | До 256 фиксаций/с |
 
-| Сущность / назначение | Записей × размер | Бюджет | Чтение, среднее / пик | Запись, среднее / пик |
-| --- | --- | ---: | ---: | ---: |
-| CandidatePool (100 кандидатов) | 100 × 32 B | 3,2 KB на снимок, обновление раз в 15 с | 2 885 / 5 771 чтений/с (до 100 строк на выдачу) | 0,067 снимка/с; до 59 696 / 121 380 изменений счетчиков/с при построении |
-| FeedCache (до 20 ID на страницу) | `5 770 × 15 × 224 B` | ~19,4 MB; TTL 15 с | 2 885 / 5 771 страниц/с | 2 885 / 5 771 страниц/с |
-| UploadSession + staging частей | 55 400 × 256 B; до 12 частей по 4 MB | ~14 MB метаданных; 2 493 GB файлов/сутки, TTL 24 ч и cap 55 400 загрузок/сутки | 8,3 / 33,3 проверок/с | 8,9 / 35,9 обновлений/с; части 7,6 / 30,7 записей/с |
-| TranscodeTaskQueue (3 качества) | `7,6 × 3 600 = 27 698` задач × 256 B | ~7 MB; TTL 1 ч | 1,9 / 7,6 задач/с | 1,9 / 7,6 задач/с |
-| ViewEventBuffer | `115 417 × 60 × 200 B` | ~1,3 GB; TTL 60 с | 57 708 / 115 417 событий/с | 57 708 / 115 417 событий/с |
-| CounterBuffer | `121 380 × 60 × 64 B` | ≤466 MB; TTL 60 с | 59 696 / 121 380 сообщений/с | 59 696 / 121 380 сообщений/с |
-| IdempotencyRecord (результат операции) | `171 млн/сутки × 256 B`; TTL 24 ч | ~43,9 GB на копию | 1 988 / 5 966 проверок/с | 1 988 / 5 966 записей/с |
+**Временные данные, файлы, кэши и очереди**
 
-После обработки ViewEvent и сообщения CounterBuffer обновляется их статус. Из популярных роликов CandidatePool формируется лента с учетом истории и длительности просмотров.
+| Сущность / данные | Окно / размер | Объем одной копии на пике | Чтение, пик | Запись, пик |
+| --- | --- | ---: | --- | --- |
+| AuthSession | 10 дней / 256 B | 14,182 GB | 153 706,79 проверок/с | 64,12 вставок/с |
+| OriginalMedia и staging, общий бюджет | 24 ч / 46,44 MB | 20,582 TB | 15,39 чтений оригинала/с | 61,56 частей/с |
+| UploadSession, метаданные | 24 ч / 256 B | 113,459 MB | 66,69 проверок/с | 71,81 операций/с |
+| TranscodeTaskQueue | 1 ч / 256 B | 14,182 MB | 15,39 задач/с | 30,78 операций/с |
+| ProductEventBuffer | 60 с / 200 B | 1,845 GB | 153 766,42 сообщений/с | 307 532,84 операций/с |
+| CounterBuffer | 60 с / 64 B | 516,328 MB | 134 460,42 сообщений/с | 268 920,83 операций/с |
+| CandidatePool, один агрегированный снимок global | 1 000 × 192 B + 32 B; обновление раз в 15 с | 192,032 KB на снимок | 5 770,83 снимков/с | 0,067 снимка/с |
+| FeedCache | TTL 30 мин / 8 064 B, до 1 000 ID | 83,765 GB | 5 770,83 списков/с | 5 770,83 списков/с |
+| IdempotencyRecord | 24 ч / 256 B | 421,458 GB | 19 054,65 проверок/с | 19 054,65 вставок/с |
 
-История ДЗ2 учитывала пару User ID + Video ID (16 B). Для последних 100 просмотров нужны также `slot`, время и длительность: запись занимает 40 B, общий объем увеличивается на `24 B × 11,3 млрд = 271,2 GB`. Буферы рассчитаны как поток операций × TTL; их бюджеты приведены в таблице. При лимите 55 400 загрузок за сутки staging частей занимает `55 400 × 45 MB = 2 493 GB`. Очереди хранят задачи и ссылки, не копии видео. Для часовой обработки оригиналов нужно до `2,5 × 3 600 × 45 MB ≈ 415,5 GB`. Это полезный объем без индексов и служебных расходов.
+Для очередей запись включает добавление и подтверждение сообщения. Их окна — штатное время обработки: при отставании объем растет. Число лайков оценено сверху: каждое действие считается новым добавлением.
 
-### 5.3. Консистентность и перекосы
+### 5.3. Консистентность и распределение нагрузки
 
-После успешного ответа лайк и комментарий сразу видны автору; повтор с тем же ключом не создает дубль. Лента и счетчики обновляются с задержкой до минуты: обработка события занимает до 5 с, пересчет счетчика — до 25 с, обновление CandidatePool — до 15 с, затем кэша — еще до 15 с. Повторные события отбрасываются. История может отставать до 5 с, профиль и дневная активность — до минуты. При сбое необработанные сообщения нельзя удалять без проверки TTL и статуса.
+- Регистрация атомарно создает `User`, `Profile`, `AuthCredential` и результат операции; логин уникален. Токены хранятся в виде хеша, сессия действует до истечения срока или отзыва.
+- Изменение лайка/комментария, результат идемпотентной операции, событие и исходящая дельта фиксируются согласованно. Повтор `operation_id` в течение 24 ч возвращает сохраненный результат; повтор события не создает вторую дельту.
+- Обработчик применяет события по порядку раздела. Изменения пользовательских агрегатов, позиция `EventConsumerState` и дельта просмотра сохраняются атомарно; сообщение подтверждается после записи состояния.
+- Просмотры/реакции могут обновлять горячие агрегаты пользователя и счетчики популярных роликов. Счетчики не вычисляются сканированием лайков; чтение медиа обслуживается CDN. Ключи `user_id` и `video_id` могут иметь перекос из-за активных пользователей и популярных роликов.
+- Состояние рекомендаций обновляется до 5 с, счетчики — до 25 с, пул — до 15 с; поисковый индекс может отставать до минуты. Готовая страница ленты сохраняет снимок до 30 минут. При отставании используются последние состояния и готовый кэш; оригинал нельзя удалять до готовности вариантов.
 
-Расчет предполагает равномерное распределение User ID. Популярный ролик или профиль автора может перегрузить соответствующий Video ID или ключ профиля. CDN сокращает чтение файлов, но не записи лайков и комментариев. Реплики ускоряют чтение, могут отставать от основной копии и не распределяют запись. Размер рабочего набора (активные профили, история, кэш ленты, популярные ролики и счетчики) зависит от активности и индексов.
+## 6. Физическая схема БД
+
+### 6.1. Размещение данных
+
+Транзакционные данные хранятся в PostgreSQL: нужны точечные чтения, индексы и атомарная запись изменения вместе с исходящим событием. Выделены три группы данных:
+
+- **A — аккаунты:** User, Profile, AuthCredential. Без шардинга: около 113 GB данных и небольшой поток регистрации; уникальность логина проверяется в одной БД.
+- **U — данные пользователя:** 256 логических шардов по `hash(user_id) % 256`. Вместе хранятся лайки, сессии, история, интересы и позиции обработчика событий.
+- **V — данные видео:** 128 логических шардов по `hash(video_id) % 128`. Вместе хранятся ролик, комментарии, счетчики и метаданные файлов.
+
+Шарды размещаются на группах серверов по нагрузке. Приложение использует общую карту размещения и стабильную hash-функцию. В каждой группе PostgreSQL один primary и две асинхронные реплики в других ЦОДах. При потере primary возможна потеря последних записей, как принято в разделе 3 [21].
+
+**Таблицы PostgreSQL**
+
+```mermaid
+flowchart TB
+  subgraph A["PostgreSQL A — без шардинга"]
+    A_User["User<br/>user_id BIGINT · PK<br/>created_at, status"]
+    A_Profile["Profile<br/>user_id · PK, FK → User<br/>display_name, updated_at"]
+    A_Credential["AuthCredential<br/>user_id · PK, FK → User<br/>login_norm · UNIQUE<br/>password_hash, updated_at"]
+    A_Idem["IdempotencyRecord · registration<br/>owner_id, operation_id · PK<br/>request_hash, operation, result_ref<br/>created_at, expires_at"]
+    A_Outbox["Outbox · локальная копия<br/>source_lane, source_seq · PK<br/>event_id, output_kind · UNIQUE<br/>user_id, event_type, payload, created_at"]
+    A_Head["SourceLaneHead · локальная копия<br/>source_lane · PK<br/>last_seq"]
+    A_User --> A_Profile
+    A_User --> A_Credential
+    A_Head --> A_Outbox
+  end
+
+  subgraph U["PostgreSQL U — hash(user_id) % 256"]
+    U_Gate["AuthGate<br/>user_id · PK<br/>auth_epoch, blocked"]
+    U_Session["AuthSession<br/>token_hash · PK<br/>user_id, auth_epoch, status, created_at, expires_at<br/>INDEX(user_id), INDEX(expires_at)"]
+    U_LikeSet["LikeSet<br/>user_id · PK<br/>version, count, updated_at"]
+    U_LikeBlock["LikeBlock<br/>user_id, min_video_id · PK<br/>FK(user_id) → LikeSet<br/>max_video_id, video_ids · до 512"]
+    U_History["UserHistory<br/>user_id · PK<br/>head, version, updated_at, recent_views · до 100"]
+    U_Interest["UserInterest<br/>user_id · PK<br/>tag_weights · до 20, version, updated_at<br/>expires_at"]
+    U_Activity["DailyActivity<br/>user_id, day · PK<br/>PARTITION BY day<br/>view_count, watched_ms"]
+    U_Consumer["EventConsumerState<br/>consumer_name, partition_id · PK<br/>last_sequence, updated_at"]
+    U_Receipt["EventReceipt<br/>user_id, event_id · PK<br/>request_hash, expires_at<br/>INDEX(expires_at)"]
+    U_Idem["IdempotencyRecord<br/>owner_id, operation_id · PK<br/>request_hash, operation, result_ref<br/>created_at, expires_at"]
+    U_Outbox["Outbox · локальная копия<br/>source_lane, source_seq · PK<br/>event_id, output_kind · UNIQUE<br/>user_id, video_id, event_type, payload, counter_delta, created_at"]
+    U_Head["SourceLaneHead · локальная копия<br/>source_lane · PK<br/>last_seq"]
+    U_LikeSet --> U_LikeBlock
+    U_Head --> U_Outbox
+  end
+
+  subgraph V["PostgreSQL V — hash(video_id) % 128"]
+    V_Video["Video<br/>video_id · PK<br/>author_id, title, tags, status<br/>created_at, duration_s"]
+    V_Comment["Comment<br/>video_id, created_at, comment_id · PK<br/>FK(video_id) → Video<br/>author_id, body, status"]
+    V_Counter["VideoCounter<br/>video_id · PK, FK → Video<br/>view_count, like_count, comment_count<br/>INDEX(view_count DESC, video_id)"]
+    V_Upload["UploadSession<br/>upload_id · PK<br/>video_id · FK → Video; user_id, state<br/>staging_ref, received_parts, created_at, expires_at"]
+    V_Original["OriginalMedia<br/>video_id · PK, FK → Video<br/>object_ref, size_bytes, checksum<br/>region_copies, expires_at"]
+    V_Variant["VideoVariant<br/>video_id, quality · PK, FK → Video<br/>object_ref, size_bytes, status<br/>region_copies, segment_ranges"]
+    V_Task["TranscodeTask<br/>task_id · PK; video_id, quality, attempt<br/>UNIQUE(video_id, quality)<br/>state, lease_until · INDEX ready tasks"]
+    V_Buffer["CounterBuffer<br/>partition_id, sequence_no · PK<br/>source_event_id, video_id, kind, delta<br/>applied_state, created_at"]
+    V_Consumer["CounterConsumerState<br/>partition_id · PK<br/>last_sequence"]
+    V_Idem["IdempotencyRecord · comment/upload<br/>owner_id, operation_id · PK<br/>request_hash, operation, result_ref<br/>created_at, expires_at"]
+    V_Outbox["Outbox · локальная копия<br/>source_lane, source_seq · PK<br/>event_id, output_kind · UNIQUE<br/>user_id, video_id, event_type, payload, counter_delta, created_at"]
+    V_Head["SourceLaneHead · локальная копия<br/>source_lane · PK<br/>last_seq"]
+    V_Video --> V_Comment
+    V_Video --> V_Counter
+    V_Video --> V_Upload
+    V_Video --> V_Original
+    V_Video --> V_Variant
+    V_Video --> V_Task
+    V_Buffer --> V_Consumer
+    V_Head --> V_Outbox
+  end
+
+  A_User -. "логическая ссылка: user_id" .-> U_Gate
+  U_LikeBlock -. "логическая ссылка: video_id" .-> V_Video
+  V_Video -. "логическая ссылка: author_id" .-> A_User
+```
+
+**Потоки и остальные хранилища**
+
+```mermaid
+flowchart TB
+    O["Outbox в PostgreSQL A / U / V"] --> R["Публикация событий"]
+
+    subgraph K["Kafka — 3 копии, minISR=2"]
+        E["product.events<br/>256 разделов по user_id<br/>event_id, video_id, event_type, occurred_at, attributes"]
+        C["counter.deltas<br/>128 разделов по video_id<br/>source_event_id, kind, delta"]
+        S["video.changes<br/>128 разделов по video_id<br/>video_id, source_version, поля документа"]
+        T["transcode.tasks<br/>128 разделов по video_id<br/>task_id, quality"]
+        P["relay.source_offsets<br/>Ключ: источник и lane<br/>Позиция: source_seq"]
+    end
+
+    R --> E
+    R --> C
+    R --> S
+    R --> T
+    R --> P
+    E --> U["PostgreSQL U<br/>UserHistory, UserInterest, DailyActivity<br/>Позиция: EventConsumerState"]
+    E --> D["ClickHouse: ProductEvent<br/>16 шардов по event_id, 3 геореплики<br/>event_date, event_id, user_id, video_id, event_type<br/>partition_id, sequence_no, occurred_at, attributes, version<br/>ORDER BY event_date, event_id; секции по дню; TTL 30 дней"]
+    C --> V["PostgreSQL V<br/>CounterBuffer, VideoCounter<br/>Позиция: CounterConsumerState"]
+    S --> I["OpenSearch: SearchDocument<br/>32 primary shards и 2 реплики<br/>_id=video_id; author_id, author_terms, title_terms, tag_terms<br/>indexed_at, source_version; инвертированные индексы"]
+    T --> W["Обработчик кодирования<br/>Состояние задачи: TranscodeTask в PostgreSQL V"]
+    W --> F["Ceph RGW / S3<br/>OriginalMedia и VideoVariant<br/>Ключ: video_id / quality / version<br/>3 геокопии, локально EC 8+4"]
+    F --> Q["Проверка копий во всех ЦОДах<br/>Публикация Video в PostgreSQL V"]
+
+    U --> L["Формирование ленты"]
+    V --> L
+    L <--> X["Redis Cluster — отдельный в каждом регионе<br/>CandidatePool: pool_key, candidates, version, generated_at<br/>FeedCache: user_id, feed_id, video_ids, expires_at<br/>Ключи по user_id; TTL ленты 30 минут<br/>Primary и 2 локальные реплики на шард"]
+```
+
+
+### 6.2. Таблицы PostgreSQL и индексы
+
+В таблице A/U/V обозначают размещение из §6.1; для всех таблиц действует указанная там репликация. PK/UK — B-tree. Межшардовые ссылки проверяет приложение; транзакции выполняются внутри одной группы PostgreSQL.
+
+| Сущность | Группа | Ключи и индексы | Особенности |
+| --- | --- | --- | --- |
+| User | A | PK(user_id) | Состояние аккаунта |
+| Profile | A | PK(user_id), FK → User | Имя автора; горячие профили кэшируются |
+| AuthCredential | A | PK(user_id), UNIQUE(login_norm), FK → User | Нормализованный логин, хеш пароля с солью |
+| AuthSession | U | PK(token_hash); user_id; expires_at | Проверка срока и отзыва на primary; user_id в подписанном токене задает маршрут |
+| UserLikes → LikeSet / LikeBlock | U | PK(user_id); PK(user_id,min_video_id) | Набор разбит на отсортированные блоки до 512 ID; меняется нужный блок, а не весь набор |
+| UserHistory | U | PK(user_id) | Кольцевой список до 100 просмотров |
+| UserInterest | U | PK(user_id); expires_at | До 20 пар тег–вес, срок активности 30 дней |
+| DailyActivity | U | PK(user_id,day); секции по day | Удаление секций старше 365 дней |
+| EventConsumerState | U | PK(consumer_name,partition_id) | Позиция обработчика сохраняется вместе с изменением состояния |
+| Video | V | PK(video_id) | Название, теги, автор и статус публикации |
+| Comment | V | PK(video_id,created_at,comment_id) | Обратный проход по индексу, выдача по курсору до 20 строк |
+| VideoCounter | V | PK(video_id); (view_count DESC,video_id) | Счетчики и отбор популярных роликов |
+| UploadSession | V | PK(upload_id); expires_at | Метаданные загрузки; подписанный upload ID содержит video_id |
+| OriginalMedia, метаданные | V | PK(video_id), FK → Video | Ссылка, размер, checksum, готовность региональных копий |
+| VideoVariant, метаданные | V | PK(video_id,quality), FK → Video | Ссылка на файл и диапазоны сегментов |
+| TranscodeTaskQueue → TranscodeTask | V | PK(task_id); UNIQUE(video_id,quality); индекс незавершенных задач по lease_until | Статус и аренда задачи кодирования |
+| CounterBuffer / CounterConsumerState | V | PK(partition_id,sequence_no); PK(partition_id) | Примененные дельты и последняя обработанная позиция |
+| IdempotencyRecord | A/U/V, рядом с операцией | PK(owner_id,operation_id); expires_at | Результат повтора запроса за 24 ч; для регистрации A, лайка U, комментария и upload V |
+| ProductEventBuffer → Outbox / SourceLaneHead | A/U/V, рядом с операцией | PK(source_lane,source_seq); UNIQUE(event_id,output_kind); PK(source_lane) | Исходящие события и порядок их доставки |
+| AuthGate | U | PK(user_id) | blocked/auth_epoch: выпуск и отзыв сессии сериализуются в одной БД |
+| EventReceipt | U | PK(user_id,event_id); expires_at | Подавление повторного API-события просмотра в течение 24 ч |
+
+Данные с истекшим сроком удаляются пакетами по expires_at. Таблицы идемпотентности не секционируются по времени, чтобы ключ оставался уникальным независимо от даты [13]. Необработанные события и задачи по TTL не удаляются.
+
+### 6.3. Остальные хранилища
+
+| Хранилище | Что храним | Зачем | Разделение и копии |
+| --- | --- | --- | --- |
+| Kafka | События, изменения счетчиков и задания обработки: ProductEventBuffer, CounterBuffer, TranscodeTaskQueue | Передавать работу фоновым обработчикам и повторять чтение после сбоя | События: 256 разделов по user_id; дельты и задания: 128 по video_id. Три копии по ЦОДам [15] |
+| ClickHouse | ProductEvent — архив действий пользователей | Считать аналитику по большому числу событий | 16 шардов по event_id, три копии каждого; хранение 30 дней [16] |
+| OpenSearch | SearchDocument — название, автор и теги ролика для поиска | Быстро находить ролики по тексту и тегам | 32 шарда по video_id, основная копия и две реплики [20] |
+| Ceph | Файлы OriginalMedia, VideoVariant и временные части загрузки | Хранить и выдавать видео | Объекты по ключу файла, три геокопии [18] |
+| Redis | CandidatePool, FeedCache и кэш профилей, роликов и счетчиков | Быстро получать готовые списки и часто читаемые данные | Распределение по ключу объекта; три копии на шард в каждом регионе [17] |
+
+- **Kafka:** сообщения хранятся 24 часа, позиции отправки — постоянно. Запись требует не менее двух синхронизированных копий.
+- **ClickHouse:** события разбиты по дням; порядок хранения — `(event_date, event_id)`. Повторы объединяет ReplicatedReplacingMergeTree; для выборок без дублей используется FINAL.
+- **OpenSearch:** инвертированный индекс связывает слова с подходящими роликами; теги индексируются точными значениями.
+- **Ceph:** S3 API используется для загрузки частями и чтения диапазонов видеофайла. Внутри региона применяется EC 8+4 — восемь фрагментов данных и четыре избыточности.
+- **Redis:** общий пул обновляется раз в 15 секунд и хранится до 60 секунд; готовая лента — 30 минут. Потерянный кэш можно построить заново.
+
+### 6.4. Денормализация и консистентность
+
+SearchDocument дублирует название, теги и имя автора для поиска. VideoCounter хранит готовые счетчики, UserHistory/UserInterest — состояние рекомендаций, FeedCache — снимок выдачи. Это исключает подсчет реакций и сбор всей истории при каждом запросе ленты.
+
+Регистрация атомарно создает аккаунт, профиль и учетные данные в A. Лайк или комментарий, результат операции и outbox записываются одной транзакцией соответствующего шарда. Relay публикует события и свою позицию одной Kafka-транзакцией; потребитель сохраняет изменения и checkpoint одной SQL-транзакцией. Так повтор доставки не добавляет вторую реакцию. Для дельты просмотра и исходного события различается output_kind.
+
+Позиции relay хранятся постоянно; transactional.id сохраняется при смене владельца, прежний издатель останавливается. После восстановления сверяются SQL-позиции и Kafka: SourceLaneHead не может быть меньше опубликованной позиции. Архивные события переигрываются в отдельные восстанавливаемые таблицы с исходными checkpoints [15].
+
+Проверка сессии читает AuthSession и AuthGate с primary U; блокировка меняет auth_epoch и сразу отзывает старые сессии. Собственный лайк также читается с primary. Пользовательское состояние обновляется из Kafka независимо от записи аналитики в ClickHouse.
+
+Горячие Profile/Video читаются из кэша. Дельты счетчиков группируются за секунду, чтобы популярное видео не требовало UPDATE на каждый просмотр. Глобальный пул собирается из top-1000 каждого V-шарда, затем выбирается общая тысяча. Реплики разгружают чтение; запись одного горячего ключа остается на его primary.
+
+Ролик публикуется после проверки копий оригинала и трех вариантов во всех ЦОДах. Метаданные готовности фиксируются в V; оригинал удаляется после завершения обработки. При потере FeedCache клиент начинает новую ленту с новым feed_id.
+
+### 6.5. Клиенты и балансировка запросов
+
+Для серверной части на Go:
+
+| Хранилище | Клиент | Подключения и маршрутизация |
+| --- | --- | --- |
+| PostgreSQL | pgx/v5 | Приложение выбирает шард; HAProxy направляет к primary/реплике, PgBouncer переиспользует подключения в transaction pooling. Primary определяется через Patroni |
+| Kafka | franz-go | Клиент получает адрес лидера раздела; consumer group распределяет разделы между обработчиками |
+| ClickHouse | clickhouse-go/v2 | Пакетная запись, Distributed-таблица для выборок, балансировка между здоровыми репликами |
+| OpenSearch | opensearch-go | Bulk API для индексации; coordinating nodes распределяют поиск |
+| Redis | go-redis/v9 | Cluster client направляет запрос в нужный hash slot |
+| Ceph RGW | AWS SDK for Go v2 | Региональный S3 endpoint через L7-балансировщик к RGW |
+
+Запись и чтение после изменения идут на primary; отложенное чтение профилей допускается с реплик. Пулы ограничены общим лимитом подключений к группе. При transaction pooling приложение не рассчитывает на состояние SQL-сессии между транзакциями [14]. Переключение primary выполняется с запретом записи старому владельцу.
+
+### 6.6. Резервное копирование
+
+Резервные копии хранятся отдельно от рабочих реплик, с отдельными правами доступа.
+
+| Данные | Копирование и восстановление |
+| --- | --- |
+| PostgreSQL A/U/V | pgBackRest: полный backup еженедельно, differential ежедневно, непрерывный архив WAL; хранение 4 недели. PITR восстанавливает данные вместе с outbox и checkpoints [19] |
+| ClickHouse | Ежедневный backup в отдельное S3-хранилище, 7 дней. После восстановления догружается доступный хвост Kafka с дедупликацией [22] |
+| Kafka | Архив committed-сообщений с исходными partition/offset и позиций relay каждые 5 мин, хранение 7 дней. Восстановление согласуется с SQL-checkpoints |
+| OpenSearch | Ежедневный snapshot, хранение 7 дней; индекс также можно перестроить из Video/Profile |
+| Готовые видео | Независимая копия неизменяемых объектов и каталога checksum; удаленные версии сохраняются 30 дней. Оригинал удерживается до подтверждения копирования вариантов |
+| Redis | Отдельный backup не требуется: пул и метаданные восстанавливаются, для ленты создается новый снимок |
+
+Восстановление регулярно проверяется в отдельном окружении. Объемы ДЗ5 — полезные данные: индексы, WAL, реплики и backup учитываются дополнительно при расчете оборудования.
 
 ## Источники
 
@@ -541,3 +795,13 @@ User и Profile связаны отношением 1:1. Для 113 млн па�
 10. Pew Research Center, 18.02.2025. [What we know about TikTok content creators](https://www.pewresearch.org/short-reads/2025/02/18/what-we-know-about-tiktok-content-creators/): авторы, на которых подписаны взрослые пользователи США.
 11. Pew Research Center, 22.02.2024. [How U.S. Adults Use TikTok](https://www.pewresearch.org/internet/2024/02/22/how-u-s-adults-use-tiktok/): опрос взрослых пользователей США в августе 2023.
 12. AWS MediaConvert. [Automated ABR](https://docs.aws.amazon.com/mediaconvert/latest/ug/auto-abr.html): подбор вариантов по исходному видео и качеству.
+13. PostgreSQL. [Table Partitioning](https://www.postgresql.org/docs/18/ddl-partitioning.html): секции, индексы и ограничения уникальности.
+14. PgBouncer. [Features](https://www.pgbouncer.org/features.html), [Configuration](https://www.pgbouncer.org/config): transaction pooling и prepared statements.
+15. Apache Kafka. [Design: Message Delivery Semantics](https://kafka.apache.org/42/design/design/), [Producer Configs](https://kafka.apache.org/42/configuration/producer-configs/): транзакции, idempotence, offsets и ограничения при внешних приемниках.
+16. ClickHouse. [ReplacingMergeTree](https://clickhouse.com/docs/reference/engines/table-engines/mergetree-family/replacingmergetree), [ReplacingMergeTree guide](https://clickhouse.com/docs/guides/replacing-merge-tree): фоновая дедупликация и FINAL.
+17. Redis. [Replication](https://redis.io/docs/latest/operate/oss_and_stack/management/replication/): асинхронность репликации и ограничения WAIT.
+18. Ceph. [RGW Multisite](https://docs.ceph.com/en/latest/radosgw/multisite/), [S3 bucket operations](https://docs.ceph.com/en/latest/radosgw/s3/bucketops/), [Erasure coding](https://docs.ceph.com/en/latest/rados/operations/erasure-code/): геосинхронизация, versioning и избыточность. Страницы latest сверяются с выбранным стабильным релизом перед внедрением.
+19. pgBackRest. [User Guide](https://pgbackrest.org/user-guide.html): full/differential backup, WAL archive, PITR и restore.
+20. OpenSearch. [Creating a cluster: shard allocation awareness](https://docs.opensearch.org/latest/tuning-your-cluster/): primary/replica shards и размещение по зонам.
+21. PostgreSQL. [Log-Shipping Standby Servers](https://www.postgresql.org/docs/18/warm-standby.html): streaming replication и риск потери данных при асинхронном failover.
+22. ClickHouse. [Backup and restore](https://clickhouse.com/docs/concepts/features/backup-restore/overview): независимые резервные копии и восстановление.
