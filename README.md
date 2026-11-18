@@ -1091,6 +1091,69 @@ flowchart LR
 | Порча данных | Проверенная резервная копия и доступный журнал | Срок определяется пробным восстановлением |
 
 
+## 11. Серверы и хостинг
+
+Основные серверы размещаем в Ростелеком-ЦОД в Москве, Екатеринбурге и Новосибирске. Бэкап храним в отдельном ЦОДе Key Point в Новосибирске. Для раздачи видео выбираем Cloud.ru CDN, у которого есть публичный прайс. Второй вариант — NGENIX с Origin Shield [47–51].
+
+### 11.1. Серверы
+
+Количество указано в порядке **Москва / Екатеринбург / Новосибирск / бэкап**. Цена сервера с NVMe включает два системных SSD.
+
+| Сервисы | Конфигурация одного сервера | M / E / N / Б | Цена, млн ₽ за сервер |
+| --- | --- | ---: | ---: |
+| Внешний NGINX (API, upload, origin) | 1U, 8 ядер, 32 GB, 2×480 GB SSD, 4×10GbE | 72 / 69 / 69 / 0 | 0,5 |
+| LVS и Keepalived | 2U, 32 ядра, 128 GB, 2×480 GB SSD, 4×100GbE | 2 / 2 / 2 / 0 | 1,5 |
+| PowerDNS и проверки GeoDNS | 1U, 8 ядер, 32 GB, 2×480 GB SSD, 2×10GbE | 1 / 1 / 1 / 0 | 0,45 |
+| Go API: Auth, Users, Feed, Video, Search, Comments, Reactions, Event, Statistics | 2U, 64 ядра, 256 GB, 2×1,92 TB NVMe, 2×25GbE | 13 / 10 / 10 / 0 | 2,6 |
+| Внутренний NGINX для gRPC | 1U, 16 ядер, 64 GB, 2×960 GB SSD, 2×25GbE | 9 / 8 / 8 / 0 | 0,85 |
+| Upload service | 1U, 16 ядер, 64 GB, 2×960 GB SSD, 2×25GbE | 2 / 2 / 2 / 0 | 0,85 |
+| ScyllaDB | 2U, 32 ядра, 256 GB, 2×3,84 TB NVMe, 2×25GbE | 34 / 34 / 34 / 0 | 2,1 |
+| Kafka, брокеры | 2U, 32 ядра, 256 GB, 2×3,84 TB NVMe, 2×25GbE | 18 / 18 / 18 / 0 | 2,1 |
+| Kafka Streams, приёмники снимков и загрузчики DWH | 2U, 32 ядра, 128 GB, 2×1,92 TB NVMe, 2×25GbE | 10 / 10 / 10 / 0 | 1,45 |
+| ClickHouse, продуктовые события | 2U, 32 ядра, 256 GB, 4×3,84 TB NVMe, 2×25GbE | 8 / 8 / 8 / 0 | 2,4 |
+| ClickHouse, логи и трассы | 2U, 32 ядра, 256 GB, 4×3,84 TB NVMe, 2×25GbE | 6 / 6 / 6 / 0 | 2,4 |
+| OpenSearch, данные | 2U, 32 ядра, 256 GB, 4×3,84 TB NVMe, 2×25GbE | 7 / 5 / 5 / 0 | 2,4 |
+| Redis Cluster | 1U, 16 ядер, 128 GB, 2×960 GB SSD, 2×25GbE | 9 / 9 / 9 / 0 | 1 |
+| KRaft, Keeper и OpenSearch cluster-manager | 1U, 8 ядер, 32 GB, 2×480 GB SSD, 2×10GbE | 3 / 3 / 3 / 0 | 0,45 |
+| FFmpeg | 2U, 32 ядра, 256 GB, 2×1,92 TB NVMe, 2×25GbE, 4×NVIDIA L4 | 36 / 19 / 19 / 0 | 4,2 |
+| CatBoost, ранжирование | 2U, 32 ядра, 128 GB, 2×1,92 TB NVMe, 2×25GbE | 5 / 4 / 4 / 0 | 1,45 |
+| Фоновые задачи: CandidatePool, рекомендации, relay, публикация и поиск | 2U, 32 ядра, 128 GB, 2×1,92 TB NVMe, 2×25GbE | 5 / 5 / 5 / 0 | 1,45 |
+| Prometheus и Alertmanager | 2U, 32 ядра, 128 GB, 2×1,92 TB NVMe, 2×25GbE | 2 / 2 / 2 / 0 | 1,45 |
+| OpenTelemetry Collector | 1U, 16 ядер, 64 GB, 2×960 GB SSD, 2×25GbE | 4 / 4 / 4 / 0 | 0,85 |
+| Grafana, управление копиями, конфигурация и артефакты CI | 1U, 16 ядер, 64 GB, 2×960 GB SSD, 2×25GbE | 2 / 2 / 2 / 0 | 0,85 |
+| Ceph OSD рабочих копий | 2U, 2×48 ядер, 256 GB, 24×15,36 TB NVMe, 2×100GbE | 25 / 25 / 25 / 0 | 27 |
+| Ceph RGW | 2U, 32 ядра, 128 GB, 2×960 GB SSD, 2×100GbE | 9 / 9 / 9 / 0 | 1,6 |
+| Ceph MON и MGR | 1U, 8 ядер, 32 GB, 2×480 GB SSD, 2×10GbE | 3 / 3 / 3 / 3 | 0,45 |
+| Ceph OSD бэкапа | 4U, 48 ядер, 128 GB, 24×20 TB HDD, 2×25GbE | 0 / 0 / 0 / 23 | 3,5 |
+| Ceph RGW бэкапа и синтетические проверки | 1U, 16 ядер, 64 GB, 2×960 GB SSD, 2×25GbE | 0 / 0 / 0 / 2 | 0,85 |
+| **Всего 829 серверов** | | **285 / 258 / 258 / 28** | |
+
+Число NGINX и LVS взято из §4.3–4.4. Для остальных узлов используем нагрузку из §2 и §5 и резервирование из §10. Скорость одного сервера — оценка до нагрузочного теста [43–45].
+
+- **API.** В Москве после отказа другого ЦОДа — до 200 тыс. запросов/с. При 22,4 тыс. запросов/с на сервер и 25% на внутреннюю обработку нужно `ceil(200 000 × 1,25 / 22 400) + 1 = 13` машин с резервом.
+- **Базы и очереди.** Для ScyllaDB закладываем 6,6 млн обращений к строкам/с на оставшийся ЦОД. При 200 тыс. на узел получаем 33 рабочих и один запасной. Для Kafka — 842 тыс. записей/с с учётом репликации и журнала Streams, 50 тыс. на брокер, итого 18 с резервом.
+- **Видео.** У FFmpeg в Москве до 15,39 задачи/с по 1 800 кадров. При 800 кадрах/с на сервер получается 35 рабочих машин и одна запасная. Для Ceph нужно 8,59 ПБ сырых дисков на ЦОД с учётом EC 8+4, метаданных и заполнения до 70%. После отказа одного сервера остаётся 8,85 ПБ. Хранилище проверяем на выдаче 346 Гбит/с с параллельным восстановлением. Для бэкапа нужно 10,39 ПБ, после отказа узла остаётся 10,56 ПБ [18, 45, 46].
+
+### 11.2. Смета на 30 дней
+
+Всего 150 стоек, из них 7 для бэкапа. На каждый основной ЦОД берём восемь каналов по 100 Гбит/с. При отказе маршрутизатора остаётся 400 Гбит/с при потребности около 352 Гбит/с. Между основными ЦОДами — по два канала 200 Гбит/с на пару, для бэкапа — два по 25 Гбит/с.
+
+Видео для CDN — **561 ПБ за 30 дней** по суточному объёму из §2.3. Цены на 18.11.2026. Для закрытых тарифов используем открытые цены похожих услуг. Ставки и выделяемую полосу нужно подтвердить у провайдеров [49–50, 52–59].
+
+| Статья | Расчёт | Млн ₽/мес. |
+| --- | --- | ---: |
+| Серверы основных ЦОДов | 3 218,9 млн ₽ / 60 мес. | 53,65 |
+| Серверы для бэкапа | 83,55 млн ₽ / 60 мес. | 1,39 |
+| Коммутаторы и маршрутизаторы | 452,4 млн ₽ / 60 мес. [56] | 7,54 |
+| Запчасти | 2% от стоимости оборудования / 60 мес. | 1,25 |
+| Стойки и питание | 150 × 104,8–134,2 тыс. ₽ по тарифам MCN и DataHouse [57] | 15,72–20,13 |
+| Интернет | 24 канала по 100 Гбит/с × 3,355–5 млн ₽ (тариф 10G IMAQLIQ × 10 и тариф 100G GalaxyData) [58] | 80,52–120 |
+| Связь ЦОДов и бэкапа | 1 250 Гбит/с × 1–5 млн ₽ за каждые 100 Гбит/с, оценка [59] | 12,5–62,5 |
+| CDN | 560,925 млн ГБ × 0,6039–0,854 ₽/ГБ (пакет 100 ТБ и цена за ГБ в прайсе Cloud.ru) + 0,1–0,5 млн ₽ на Origin Shield [50] | 338,84–479,53 |
+| **Всего за 30 дней** | | **511,42–745,99** |
+
+Зарплаты и разовое подключение площадок считаются отдельно.
+
 ## Источники
 
 1. TikTok Newsroom. «Thanks a billion!», 27.09.2021: [официальное сообщение](https://newsroom.tiktok.com/1-billion-people-on-tiktok-my?lang=en-MY).
@@ -1137,3 +1200,20 @@ flowchart LR
 40. Grafana k6. [Constant arrival rate](https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/constant-arrival-rate/): открытая модель нагрузки и ограничения генератора.
 41. OpenSearch. [Index Document API: external versioning](https://docs.opensearch.org/latest/api-reference/document-apis/index-document/): сравнение внешних версий при повторной доставке полного документа.
 42. Apache Kafka. [Broker Configs](https://kafka.apache.org/42/configuration/broker-configs/): `min.insync.replicas` и взаимодействие с `acks=all`.
+43. Курс Highload. [Базовый расчёт аппаратных ресурсов и выбор хостинга](https://github.com/init/highload/blob/main/highload_l11_hosting.md).
+44. ScyllaDB. [Maximizing ScyllaDB Performance](https://docs.scylladb.com/manual/branch-2025.4/operating-scylla/procedures/tips/benchmark-tips.html), [тест смешанной нагрузки на AWS i4i](https://www.scylladb.com/2022/09/07/benchmarking-scylladb-5-0-on-aws-i4i-4xlarge/).
+45. NVIDIA. [Производительность NVENC](https://docs.nvidia.com/video-technologies/video-codec-sdk/13.1/nvenc-application-note/), [характеристики L4](https://www.nvidia.com/en-sg/data-center/l4/).
+46. Ceph. [Ресурсы на один OSD](https://docs.ceph.com/en/latest/start/minimum-hardware/). Supermicro. [Сервер 2U на 24 NVMe](https://www.supermicro.com/en/products/system/hyper/2u/as%20-2125hs-tnr).
+47. Ростелеком-ЦОД. [ЦОДы в Москве, Екатеринбурге и Новосибирске](https://www.company.rt.ru/ir/news_calendar/d460740/), [размещение оборудования в Новосибирске](https://www.company.rt.ru/press/news_ir/news/d457923/).
+48. Key Point. [Размещение оборудования в Новосибирске](https://www.keypoint-group.ru/cod/novosibirsk/).
+49. Cloud.ru. [CDN и ёмкость сети](https://cloud.ru/products/cloud-cdn), [описание услуги и экранирования](https://cdn.cloud.ru/docs/legal/contracts/terms-of-service/crs/current-version/description-cdn.pdf).
+50. Cloud.ru. [Прайс CDN](https://cdn.cloud.ru/docs/legal/tariffs/crs/current-version/cdn.pdf), строки 23 и 30.
+51. NGENIX. [Каталог сервисов](https://help.ngenix.net/user-docs/services/), [Origin Shield](https://help.ngenix.net/user-docs/origin-shield-osd/).
+52. B2Bay. [Сервер с Xeon E-2488](https://b2bay.ru/product/E-2488/). PORT-IT. [Пример цены сервера на 64 ядра и 256 GB](https://port-it.ru/index.php?code=R2D5F584&route=extension%2Fportit%2Fserver_builder.pdf).
+53. Сервер Центр. [NVMe Samsung PM9A3 3,84 TB](https://server-center.ru/products/nakopitel-samsung-pm9a3-384tb-mzql23t8hcls-00a07). ITequip. [NVMe Samsung PM9D3a 15,36 TB](https://itequiprus.ru/catalog/drives/nvme-u-2-u-3/).
+54. KNS. [HDD Toshiba 20 TB](https://www.kns.ru/product/zhestkii-disk-toshiba-20tb-mg10aca20te/). Olsys. [4U-платформа на 24 HDD](https://olsys.ru/product/servernaya-platforma-snr-sr4224re-4u-amd-epyc-ddr4-24xhdd-rezerviruemyj-bp/).
+55. Compstone. [Открытая цена NVIDIA L4](https://compstone.ru/product/nvidia-900-2g193-0000-000/).
+56. NVIDIA. [Порты и разветвление линий SN4700](https://networking-docs.nvidia.com/sn4000hw/cable-installation). ITequip. [Цены коммутаторов 25/100GbE](https://itequiprus.ru/kupit/kommutator-100g/), [цена SN4700](https://itequiprus.ru/vendor/mellanox/).
+57. [Тарифы стоек MCN](https://datacenter.mcn.ru/arenda-stoek/) и [DataHouse](https://datahouse.ru/price/).
+58. [Тарифы IMAQLIQ на гарантированный интернет](https://iqdata.center/channels-and-communication-lines/) и [GalaxyData](https://galaxydata.ru/colocation/).
+59. [RETN Capacity: магистральные каналы](https://www.retn.ru/products/capacity), [РКК: прайс на каналы, пункт 1.10](https://rck.su/media/uploads/2025/12/12/perechen_i_stoimost_tarifov_s_01-01-2026_kTJBBIP.pdf).
